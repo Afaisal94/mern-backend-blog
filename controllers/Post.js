@@ -1,4 +1,5 @@
 const fs = require("fs");
+const Category = require("../models/Category");
 const Post = require("../models/Post");
 const Comment = require("../models/Comment");
 const slugify = require("slugify");
@@ -80,12 +81,35 @@ const getPostById = async (req, res) => {
   }
 };
 
+// GET POST BY CATEGORY NAME
+const getPostByCategoryName = async (req, res) => {
+  // GET Category Id
+  const name = req.params.name;
+  const categories = await Category.find({ name: { $regex: new RegExp(name), $options: "i" } });
+  const categoryId = categories[0]._id;
+
+  try {
+    const post = await Post.find({})
+      .where('category').equals(categoryId)
+      .select("_id title category content description image slug createdAt")
+      .populate({ path: "category", select: "_id name" });
+    res.status(200).json({
+      posts: post,
+      total_posts: post.length
+    });
+  } catch (err) {
+    res.status(400).json({
+      message: err.message,
+    });
+  }
+};
+
 // CREATE
 const savePost = async (req, res) => {
   if (req.files === null)
     return res.status(400).json({ msg: "No File Uploaded" });
 
-  // const imageUrl = `${req.protocol}://${req.get("host")}/${req.file.filename}`;
+  const imageUrl = `${req.protocol}://${req.get("host")}/${req.file.filename}`;
 
   const createPost = new Post({
     title: req.body.title,
@@ -93,7 +117,7 @@ const savePost = async (req, res) => {
     description: req.body.description,
     category: req.body.category,
     slug: slugify(req.body.title),
-    image: req.file.filename,
+    image: imageUrl,
   });
   try {
     const post = await createPost.save();
@@ -129,7 +153,7 @@ const updatePost = async (req, res) => {
     }
   } else {
     try {
-
+      const imageUrl = `${req.protocol}://${req.get("host")}/${req.file.filename}`;
       const postUpdate = await Post.updateOne(
         { _id: req.params.id },
         {
@@ -138,7 +162,7 @@ const updatePost = async (req, res) => {
           description: req.body.description,
           category: req.body.category,
           slug: slugify(req.body.title),
-          image: req.file.filename,
+          image: imageUrl,
         }
       );
       // Delete old image
@@ -174,4 +198,5 @@ module.exports = {
   savePost,
   updatePost,
   deletePost,
+  getPostByCategoryName
 };
