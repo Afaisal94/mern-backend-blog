@@ -30,16 +30,16 @@ const postGenerator = async (req, res) => {
           description: trim_words(data[i]["body"], 20),
           category: category,
           slug: slugify(headline),
-          image: data[i]["thumbnail"],
+          imageUrl: data[i]["thumbnail"],
         });
         createPost.save();
       }
 
       // Success
-      res.json({ message: "Post Genarator successfully !" });
+      res.json({ message: "Post genarator successfully" });
     })
-    .catch((err) => {
-      res.json({ message: err });
+    .catch((error) => {
+      res.json({ message: error.message });
     });
 };
 

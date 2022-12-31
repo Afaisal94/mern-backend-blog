@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 const Category = require("../models/Category");
 const Post = require("../models/Post");
 const Comment = require("../models/Comment");
@@ -6,41 +7,64 @@ const slugify = require("slugify");
 
 // GET ALL
 const getPosts = async (req, res) => {
-  const title = req.query.q;
+  const title = req.query.title;
   const slug = req.query.slug;
   const category = req.query.category;
+  const paging = Boolean(req.query.paging) || Boolean(false);
+  const page = req.query.page || 1;
+  const limit = req.query.limit || 10;
+  const options = {
+    populate: "category",
+    // sort: { createdAt: -1 },
+    page: page,
+    limit: limit,
+  };
 
   // GET POST BY SLUG
   if (slug !== undefined) {
     try {
       const post = await Post.findOne()
-        .select("_id title category content description image slug createdAt")
+        .select(
+          "_id title category content description image imageUrl slug createdAt"
+        )
         .where("slug")
         .equals(slug)
         .populate({ path: "category", select: "_id name" });
       res.status(200).json(post);
-    } catch (err) {
+    } catch (error) {
       res.status(400).json({
-        message: err.message,
+        message: error.message,
       });
     }
 
     // GET POST BY CATEGORY ID
   } else if (category !== undefined) {
     try {
-      const post = await Post.find()
-        .select("_id title category content description image slug createdAt")
-        .where("category")
-        .equals(category)
-        .populate({ path: "category", select: "_id name" })
-        .sort("-createdAt");
-      res.status(200).json({
-        posts: post,
-        total_posts: post.length
-      });
-    } catch (err) {
+      if (paging) {
+        const posts = await Post.paginate(
+          {
+            category: category,
+          },
+          options
+        );
+        res.status(200).json(posts);
+      } else {
+        const posts = await Post.find()
+          .select(
+            "_id title category content description image imageUrl slug createdAt"
+          )
+          .where("category")
+          .equals(category)
+          .populate({ path: "category", select: "_id name" })
+          .sort("-createdAt");
+        res.status(200).json({
+          docs: posts,
+          totalDocs: posts.length
+        });
+      }
+    } catch (error) {
       res.status(400).json({
-        message: err.message,
+        message: error.message,
       });
     }
 
@@ -51,129 +75,167 @@ const getPosts = async (req, res) => {
       : {};
 
     try {
-      const post = await Post.find(condition)
-        .select("_id title category content description image slug createdAt")
-        .populate({ path: "category", select: "_id name" })
-        .sort("-createdAt");
-      res.status(200).json({
-        posts: post,
-        total_posts: post.length
-      });
-    } catch (err) {
+      if (paging) {
+        const posts = await Post.paginate(condition, options);
+        res.status(200).json(posts);
+      } else {
+        const posts = await Post.find(condition)
+          .select(
+            "_id title category content description image imageUrl slug createdAt"
+          )
+          .populate({ path: "category", select: "_id name" })
+          .sort("-createdAt");
+        res.status(200).json({
+          docs: posts,
+          totalDocs: posts.length
+        });
+      }
+    } catch (error) {
       res.status(400).json({
-        message: err.message,
+        message: error.message,
       });
     }
   }
 };
 
-// GET ONE
+// GET POST BY ID
 const getPostById = async (req, res) => {
   try {
     const post = await Post.findById({ _id: req.params.id })
-      .select("_id title category content description image slug createdAt")
+      .select(
+        "_id title category content description image imageUrl slug createdAt"
+      )
       .populate({ path: "category", select: "_id name" });
     res.status(200).json(post);
-  } catch (err) {
+  } catch (error) {
     res.status(400).json({
-      message: err.message,
+      message: error.message,
     });
   }
 };
 
 // GET POST BY CATEGORY NAME
 const getPostByCategoryName = async (req, res) => {
-  // GET Category Id
+  const page = req.query.page || 1;
+  const limit = req.query.limit || 10;
+  const options = {
+    populate: "category",
+    // sort: { createdAt: -1 },
+    page: page,
+    limit: limit,
+  };
+
+  // Get Category Id
   const name = req.params.name;
-  const categories = await Category.find({ name: { $regex: new RegExp(name), $options: "i" } });
+  const categories = await Category.find({
+    name: { $regex: new RegExp(name), $options: "i" },
+  });
   const categoryId = categories[0]._id;
 
   try {
-    const post = await Post.find({})
-      .where('category').equals(categoryId)
-      .select("_id title category content description image slug createdAt")
-      .populate({ path: "category", select: "_id name" });
-    res.status(200).json({
-      posts: post,
-      total_posts: post.length
-    });
-  } catch (err) {
+    const posts = await Post.paginate(
+      {
+        category: categoryId,
+      },
+      options
+    );
+    res.status(200).json(posts);
+    
+  } catch (error) {
     res.status(400).json({
-      message: err.message,
+      message: error.message,
     });
   }
 };
 
 // CREATE
-const savePost = async (req, res) => {
+const createPost = async (req, res) => {
   if (req.files === null)
-    return res.status(400).json({ msg: "No File Uploaded" });
+    return res.status(400).json({ message: "No File Uploaded" });
 
-  const imageUrl = `${req.protocol}://${req.get("host")}/${req.file.filename}`;
+  const file = req.files.image;
+  const fileSize = file.data.length;
+  const ext = path.extname(file.name);
+  const fileName = file.md5 + ext;
+  const url = `${req.protocol}://${req.get("host")}/images/${fileName}`;
+  const allowedType = [".png", ".jpg", ".jpeg"];
 
-  const createPost = new Post({
-    title: req.body.title,
-    content: req.body.content,
-    description: req.body.description,
-    category: req.body.category,
-    slug: slugify(req.body.title),
-    image: imageUrl,
+  if (!allowedType.includes(ext.toLowerCase()))
+    return res.status(422).json({ message: "Invalid Images" });
+  if (fileSize > 5000000)
+    return res.status(422).json({ message: "Image must be less than 5 MB" });
+
+  file.mv(`./public/images/${fileName}`, async (error) => {
+    if (error) return res.status(500).json({ message: error.message });
+    try {
+      const createPost = new Post({
+        title: req.body.title,
+        content: req.body.content,
+        description: req.body.description,
+        category: req.body.category,
+        slug: slugify(req.body.title).toLowerCase(),
+        image: fileName,
+        imageUrl: url,
+      });
+      await createPost.save();
+      res.status(201).json({
+        message: "Post created successfuly",
+        data: createPost,
+      });
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   });
-  try {
-    const post = await createPost.save();
-    res.status(201).json({ message: "Post Created Successfuly" });
-  } catch (err) {
-    res.status(400).json({
-      message: err.message,
-    });
-  }
 };
 
 // UPDATE
 const updatePost = async (req, res) => {
-  const postById = await Post.findById({ _id: req.params.id });
-  // Check Image
-  if (req.file == undefined) {
-    try {
-      const postUpdate = await Post.updateOne(
-        { _id: req.params.id },
-        {
-          title: req.body.title,
-          content: req.body.content,
-          description: req.body.description,
-          category: req.body.category,
-          slug: slugify(req.body.title),
-        }
-      );
-      res.status(201).json({ message: "Post Updated Successfuly" });
-    } catch (err) {
-      res.status(400).json({
-        message: err.message,
-      });
-    }
+  const post = await Post.findById({ _id: req.params.id });
+  if (!post) return res.status(404).json({ message: "No Data Found" });
+
+  let fileName = "";
+
+  if (req.files === null) {
+    fileName = post.image;
   } else {
-    try {
-      const imageUrl = `${req.protocol}://${req.get("host")}/${req.file.filename}`;
-      const postUpdate = await Post.updateOne(
-        { _id: req.params.id },
-        {
-          title: req.body.title,
-          content: req.body.content,
-          description: req.body.description,
-          category: req.body.category,
-          slug: slugify(req.body.title),
-          image: imageUrl,
-        }
-      );
-      // Delete old image
-      const filepath = `./uploads/${postById.image}`;
-      fs.unlinkSync(filepath);
-      res.status(201).json({ message: "Post Updated Successfuly" });
-    } catch (err) {
-      res.status(400).json({
-        message: err.message,
-      });
-    }
+    const file = req.files.image;
+    const fileSize = file.data.length;
+    const ext = path.extname(file.name);
+    fileName = file.md5 + ext;
+    const allowedType = [".png", ".jpg", ".jpeg"];
+
+    if (!allowedType.includes(ext.toLowerCase()))
+      return res.status(422).json({ message: "Invalid Images" });
+    if (fileSize > 5000000)
+      return res.status(422).json({ message: "Image must be less than 5 MB" });
+
+    const filepath = `./public/images/${post.image}`;
+    fs.unlinkSync(filepath);
+    file.mv(`./public/images/${fileName}`, (error) => {
+      if (error) return res.status(500).json({ message: error.message });
+    });
+  }
+
+  const url = `${req.protocol}://${req.get("host")}/images/${fileName}`;
+
+  try {
+    await Post.updateOne(
+      { _id: req.params.id },
+      {
+        title: req.body.title,
+        content: req.body.content,
+        description: req.body.description,
+        category: req.body.category,
+        slug: slugify(req.body.title).toLowerCase(),
+        image: fileName,
+        imageUrl: url,
+      }
+    );
+    res.status(201).json({
+      message: "Post updated successfuly",
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 };
 
@@ -181,13 +243,15 @@ const updatePost = async (req, res) => {
 const deletePost = async (req, res) => {
   try {
     // Delete Post by id
-    const postDelete = await Post.deleteOne({ _id: req.params.id });
+    await Post.deleteOne({ _id: req.params.id });
     // Delete All Comment by Post id
-    const commentDelete = await Comment.deleteMany({ post: req.params.id });
-    res.status(200).json({ message: "Post successfully deleted !" });
-  } catch (err) {
+    await Comment.deleteMany({ post: req.params.id });
+    res.status(200).json({
+      message: "Post deleted successfully",
+    });
+  } catch (error) {
     res.status(400).json({
-      message: err.message,
+      message: error.message,
     });
   }
 };
@@ -195,8 +259,8 @@ const deletePost = async (req, res) => {
 module.exports = {
   getPosts,
   getPostById,
-  savePost,
+  getPostByCategoryName,
+  createPost,
   updatePost,
   deletePost,
-  getPostByCategoryName
 };
