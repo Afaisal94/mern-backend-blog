@@ -2,15 +2,15 @@ const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
 require("dotenv").config();
-mongoose.set('strictQuery', true);
+mongoose.set("strictQuery", true);
 const bodyParser = require("body-parser");
 const FileUpload = require("express-fileupload");
 const cors = require("cors");
+const morgan = require("morgan");
 const port = process.env.PORT || 5000;
-// const DB_CONNECTION = process.env.DB_CONNECTION || 'mongodb://localhost:27017/db_blog'
 const DB_CONNECTION = process.env.DB_CONNECTION;
 
-// Middleware
+app.use(morgan("dev"));
 app.use(express.static("public"));
 app.use(FileUpload());
 app.use(cors());
