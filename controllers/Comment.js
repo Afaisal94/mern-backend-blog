@@ -47,7 +47,10 @@ const getCommentByPost = async (req, res) => {
     const comment = await Comment.find({ post: req.params.id })
       .select("_id comment post")
       .populate({ path: "post", select: "_id title" });
-    res.status(200).json(comment);
+    res.status(200).json({
+      docs: comment,
+      totalDocs: comment.length,
+    });
   } catch (err) {
     res.status(400).json({ message: err });
   }
