@@ -150,14 +150,14 @@ const getPostByCategoryName = async (req, res) => {
 
 // CREATE
 const createPost = async (req, res) => {
-  if (req.files === null)
+  if (!req.files)
     return res.status(400).json({ message: "No File Uploaded" });
 
   const file = req.files.image;
   const fileSize = file.data.length;
   const ext = path.extname(file.name);
   const fileName = file.md5 + ext;
-  const url = `${req.protocol}://${req.get("host")}/images/${fileName}`;
+  const url = `${req.protocol}://${req.get("host")}/temp/images/${fileName}`;
   const allowedType = [".png", ".jpg", ".jpeg"];
 
   if (!allowedType.includes(ext.toLowerCase()))
@@ -165,7 +165,7 @@ const createPost = async (req, res) => {
   if (fileSize > 5000000)
     return res.status(422).json({ message: "Image must be less than 5 MB" });
 
-  file.mv(`./public/images/${fileName}`, async (error) => {
+  file.mv(__dirname + `/temp/images/${fileName}`, async (error) => {
     if (error) return res.status(500).json({ message: error.message });
     try {
       const createPost = new Post({
@@ -209,14 +209,14 @@ const updatePost = async (req, res) => {
     if (fileSize > 5000000)
       return res.status(422).json({ message: "Image must be less than 5 MB" });
 
-    const filepath = `./public/images/${post.image}`;
+    const filepath = `./temp/images/${post.image}`;
     fs.unlinkSync(filepath);
-    file.mv(`./public/images/${fileName}`, (error) => {
+    file.mv(__dirname + `/temp/images/${fileName}`, (error) => {
       if (error) return res.status(500).json({ message: error.message });
     });
   }
 
-  const url = `${req.protocol}://${req.get("host")}/images/${fileName}`;
+  const url = `${req.protocol}://${req.get("host")}/temp/images/${fileName}`;
 
   try {
     await Post.updateOne(

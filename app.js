@@ -10,9 +10,14 @@ const morgan = require("morgan");
 const port = process.env.PORT || 5000;
 const DB_CONNECTION = process.env.DB_CONNECTION;
 
-// app.use(morgan('dev'));
-app.use(express.static("public"));
-app.use(FileUpload());
+app.use(morgan('dev'));
+// app.use(express.static("public"));
+app.use(express.static(__dirname + '/tmp'));
+// app.use(FileUpload());
+app.use(FileUpload({
+  useTempFiles: true,
+  tempFileDir: "/tmp",
+}))
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -44,9 +49,9 @@ mongoose.connect(DB_CONNECTION, {
 let db = mongoose.connection;
 
 db.on("error", console.error.bind(console, "Database connection failed"));
-// db.once("open", () => {
-//   console.log("Database connection successful");
-// });
+db.once("open", () => {
+  console.log("Database connection successful");
+});
 
 app.listen(port, () => {
   console.log(`App listening on port ${port}`);
