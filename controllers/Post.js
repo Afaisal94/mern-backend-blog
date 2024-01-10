@@ -154,16 +154,17 @@ const createPost = async (req, res) => {
     return res.status(400).json({ message: "No File Uploaded" });
 
   const file = req.files.image;
-  const fileSize = file.data.length;
+  // const fileSize = file.data.length;
   const ext = path.extname(file.name);
   const fileName = file.md5 + ext;
-  const url = `${req.protocol}://${req.get("host")}/temp/images/${fileName}`;
-  const allowedType = [".png", ".jpg", ".jpeg"];
+  // const url = `${req.protocol}://${req.get("host")}/temp/images/${fileName}`;
+  const url = file.name.tempFilePath;
+  // const allowedType = [".png", ".jpg", ".jpeg"];
 
-  if (!allowedType.includes(ext.toLowerCase()))
-    return res.status(422).json({ message: "Invalid Images" });
-  if (fileSize > 5000000)
-    return res.status(422).json({ message: "Image must be less than 5 MB" });
+  // if (!allowedType.includes(ext.toLowerCase()))
+  //   return res.status(422).json({ message: "Invalid Images" });
+  // if (fileSize > 5000000)
+  //   return res.status(422).json({ message: "Image must be less than 5 MB" });
 
   file.mv(__dirname + `/temp/images/${fileName}`, async (error) => {
     if (error) return res.status(500).json({ message: error.message });

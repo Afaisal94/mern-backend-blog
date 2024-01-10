@@ -11,9 +11,7 @@ const port = process.env.PORT || 5000;
 const DB_CONNECTION = process.env.DB_CONNECTION;
 
 app.use(morgan('dev'));
-// app.use(express.static("public"));
 app.use(express.static(__dirname + '/tmp'));
-// app.use(FileUpload());
 app.use(FileUpload({
   useTempFiles: true,
   tempFileDir: "/tmp",
